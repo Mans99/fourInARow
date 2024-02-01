@@ -1,3 +1,5 @@
+import time
+from typing import Tuple
 import gym
 import random
 import requests
@@ -5,6 +7,7 @@ import numpy as np
 import argparse
 import sys
 from gym_connect_four import ConnectFourEnv
+from copy import deepcopy
 
 env: ConnectFourEnv = gym.make("ConnectFour-v0")
 
@@ -56,7 +59,7 @@ def opponents_move(env):
    # TODO: Optional? change this to select actions with your policy too
    # that way you get way more interesting games, and you can see if starting
    # is enough to guarrantee a win
-   action = random.choice(list(avmoves))
+   _, action = minMax(3, env, 1, np.inf, -np.inf)
 
    state, reward, done, _ = env.step(action)
    if done:
@@ -65,14 +68,138 @@ def opponents_move(env):
    env.change_player() # change back to student before returning
    return state, reward, done
 
-def student_move():
-   """
+"""
    TODO: Implement your min-max alpha-beta pruning algorithm here.
    Give it whatever input arguments you think are necessary
    (and change where it is called).
    The function should return a move from 0-6
+   needed - rekursiv funktion som kollar moves baserat på min & max score
+            - funktion som kan assistera i att räkna ut score
+            - sätt att få algoritmen att välja optimalare rutor, t.ex. mitten första, maximera antal i rad, undvik rad 2.
    """
-   return random.choice([0, 1, 2, 3, 4, 5, 6])
+def student_move():
+         
+   time1 = time.time()      
+   _, move = minMax(5, env, 1, -np.inf, np.inf)
+   print(time.time() - time1)
+   print(move)
+   return move
+
+def minMax(depth, env, player, alpha, beta) -> Tuple[int, int]:
+      if depth == 0:
+         return score(env.board), 0
+      if player == 1:
+         best_score = -np.inf
+         best_move = 0
+         moves = eval(env, player) #kalla på något som sorterar moves enligt poäng
+         for move in moves:
+            copy = deepcopy(env)
+            _, _, _, _ = copy.step(move[0])
+            copy.change_player()
+            points, _ = minMax(depth - 1, copy, -1 * player, alpha, beta)
+            alpha = max(alpha, points)
+            if best_score < points:
+               best_score = points
+               best_move = move[0]
+            if beta <= alpha: break
+            if best_score > 1000:
+               return best_score, move[0]
+            
+         return best_score, best_move
+      else:
+         best_score = np.inf
+         best_move = 0
+         moves = eval(env, player) #kalla på något som sorterar moves enligt poäng
+         for move in moves:
+            copy = deepcopy(env)
+            _, _, _, _ = copy.step(move[0])
+            copy.change_player()
+            points, _ = minMax(depth - 1, copy, -1 * player, alpha, beta)
+            beta = min(beta, points)
+            if best_score > points:
+               best_score = points
+               best_move = move[0]
+            if alpha <= beta: break
+            if best_score < -1000:
+               return best_score, move[0]
+            
+         return best_score, best_move
+
+def score(env) -> int:
+   points = 0
+   for s in range(2,5):
+      points += check_inrow(env, s)
+   score_grid = [[0,0,0,0,0,0,0],
+                 [0,0,0,0,0,0,0],
+                 [0,0,1,1,1,0,0],
+                 [0,0,8,10,8,0,0],
+                 [0,0,6,4,6,0,0],
+                 [0,0,8,10,8,0,0]]
+   for i in range(len(env)): #kollar alla rader
+            for j in range(len(env[0])): #kollar alla positioner på raden
+                points += score_grid[i][j] * env[i][j]#summerar värdena från x till x + range
+   return points
+   
+def check_inrow(env, nbr) -> int:
+        x = 1
+        if nbr == 4:
+           x = 10000000
+        elif nbr == 3:
+           x = 10
+        points = 0
+        # Test rows
+        for i in range(len(env)): #kollar alla rader
+            for j in range(len(env[0]) - (nbr - 1)): #kollar alla positioner på raden
+                value = sum(env[i][j:j + nbr]) #summerar värdena från x till x + range
+                if abs(value) == nbr:
+                    points += nbr * env[i][j] * x
+                    j += nbr
+
+        # Test columns on transpose array
+        reversed_board = [list(i) for i in zip(*env)]
+        for i in range(len(env[0])):
+            for j in range(len(env) - (nbr - 1)):
+                value = sum(reversed_board[i][j:j + nbr])
+                if abs(value) == nbr:
+                    points += nbr * reversed_board[i][j] * x
+                    j += nbr
+
+        # Test diagonal
+        for i in range(len(env) - (nbr - 1)):
+            for j in range(len(env[0]) - (nbr - 1)):
+                value = 0
+                for k in range(nbr):
+                    value += env[i + k][j + k]
+                    if abs(value) == nbr:
+                        points += nbr * env[i][j] * x
+
+        reversed_board = np.fliplr(env)
+        # Test reverse diagonal
+        for i in range(len(env) - (nbr - 1)):
+            for j in range(len(env[0]) - (nbr - 1)):
+                value = 0
+                for k in range(nbr):
+                    value += reversed_board[i + k][j + k]
+                    if abs(value) == nbr:
+                        points += nbr * reversed_board[i][j] * x
+
+        return points
+
+def eval(board, player):
+   moves = board.available_moves()
+   points = 0
+   order = []
+   for move in moves:
+      copy = deepcopy(board)
+      check,_,_,_ = copy.step(move)
+      points = score(check)
+      order.append((move, points))
+   if player == 1:
+      order.sort(key=lambda a: a[1], reverse=True)
+   else:
+      order.sort(key=lambda a: a[1], reverse=False)  
+   return order
+   
 
 def play_game(vs_server = False):
    """
@@ -120,7 +247,7 @@ def play_game(vs_server = False):
    done = False
    while not done:
       # Select your move
-      stmove = student_move() # TODO: change input here
+      stmove = student_move() # TODO: change input here state, 5, -np.inf, -np.inf, True
 
       # make both student and bot/server moves
       if vs_server:
