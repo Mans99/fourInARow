@@ -59,7 +59,7 @@ def opponents_move(env):
    # TODO: Optional? change this to select actions with your policy too
    # that way you get way more interesting games, and you can see if starting
    # is enough to guarrantee a win
-   _, action = minMax(3, env, 1, np.inf, -np.inf)
+   action = int(input("your move: "))
 
    state, reward, done, _ = env.step(action)
    if done:
@@ -82,13 +82,13 @@ def student_move():
    time1 = time.time()      
    _, move = minMax(5, env, 1, -np.inf, np.inf)
    print(time.time() - time1)
-   print(move)
    return move
 
 def minMax(depth, env, player, alpha, beta) -> Tuple[int, int]:
-      if depth == 0:
+      if depth == 0 or env.is_win_state():
+         #print(depth)
          return score(env.board), 0
-      if player == 1:
+      if player == 1: #maximizing
          best_score = -np.inf
          best_move = 0
          moves = eval(env, player) #kalla på något som sorterar moves enligt poäng
@@ -97,16 +97,15 @@ def minMax(depth, env, player, alpha, beta) -> Tuple[int, int]:
             _, _, _, _ = copy.step(move[0])
             copy.change_player()
             points, _ = minMax(depth - 1, copy, -1 * player, alpha, beta)
-            alpha = max(alpha, points)
             if best_score < points:
                best_score = points
                best_move = move[0]
+            alpha = max(alpha, points)
             if beta <= alpha: break
-            if best_score > 1000:
-               return best_score, move[0]
             
          return best_score, best_move
-      else:
+      
+      else: #minimizing
          best_score = np.inf
          best_move = 0
          moves = eval(env, player) #kalla på något som sorterar moves enligt poäng
@@ -115,13 +114,11 @@ def minMax(depth, env, player, alpha, beta) -> Tuple[int, int]:
             _, _, _, _ = copy.step(move[0])
             copy.change_player()
             points, _ = minMax(depth - 1, copy, -1 * player, alpha, beta)
-            beta = min(beta, points)
             if best_score > points:
                best_score = points
                best_move = move[0]
+            beta = min(beta, points)
             if alpha <= beta: break
-            if best_score < -1000:
-               return best_score, move[0]
             
          return best_score, best_move
 
